@@ -439,7 +439,6 @@ function panel(lines) {
 
 function draw() {
   drawBackground();
-  if (H > W) { text('📱 Vire o celular', W / 2, OY / 2, 56, '#5a7fa8'); text('de lado para jogar!', W / 2, OY / 2 + 70, 56, '#5a7fa8'); }
   stars.forEach(drawStar);
   obs.forEach(drawObstacle);
   drawLaura();
