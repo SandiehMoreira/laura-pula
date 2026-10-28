@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true); // recorde salvo no localStorage
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(true);
-        web.setBackgroundColor(0xFFFDE7F3);
+        web.setBackgroundColor(0xFF8FD3FF);
         web.loadUrl("file:///android_asset/www/index.html");
         setContentView(web);
         telaCheia();

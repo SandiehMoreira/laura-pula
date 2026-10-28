@@ -3,7 +3,7 @@
 ; Instala so para o usuario (sem pedir administrador). O jogo abre numa janela propria do Edge (modo app).
 
 #define AppName "Laura Pula!"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 
 [Setup]
 AppId={{B5D2E8F1-6A3C-4C7E-9F21-3E8A7D5C4B19}

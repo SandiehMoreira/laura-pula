@@ -2,44 +2,47 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Laura Pula!</title>
-<meta name="theme-color" content="#ff6fae">
+<meta name="theme-color" content="#8fd3ff">
+<!-- atalho na tela de início (iPhone/Android): abre em tela cheia, sem barra do navegador -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Laura Pula">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone/icone-192.png">
 <link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
 <style>
-  html,body{margin:0;min-height:100%;background:#fde7f3;font-family:'Comic Sans MS','Trebuchet MS',sans-serif;}
-  body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
-  #wrap{width:min(960px,calc(100vw - 16px),calc((100vh - 120px) * 2.8125));}
-  /* celular deitado / tela baixa: some o texto de ajuda e o jogo ocupa a altura toda */
-  @media (max-height:520px){
-    p{display:none;}
-    .bar{margin-top:6px;}
-    button{padding:8px 16px;font-size:16px;}
-    #wrap{width:min(960px,calc(100vw - 16px),calc((100vh - 64px) * 2.8125));}
-  }
-  canvas{width:100%;aspect-ratio:900/320;display:block;border-radius:18px;box-shadow:0 8px 30px rgba(200,80,150,.25);background:#bfe8ff;cursor:pointer;}
-  .bar{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
-  button{font:inherit;font-size:18px;border:0;border-radius:14px;padding:12px 20px;background:#ff6fae;color:#fff;box-shadow:0 4px 0 #d94a8a;cursor:pointer;}
+  html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:#8fd3ff;font-family:'Comic Sans MS','Trebuchet MS',sans-serif;}
+  body{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:pointer;}
+  #safe{position:fixed;inset:0;pointer-events:none;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  .bar{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:calc(env(safe-area-inset-left) + 10px);display:flex;gap:8px;}
+  button{font:inherit;font-size:16px;border:0;border-radius:14px;padding:8px 14px;background:#ff6fae;color:#fff;box-shadow:0 4px 0 #d94a8a;cursor:pointer;opacity:.9;}
   button:active{transform:translateY(3px);box-shadow:0 1px 0 #d94a8a;}
-  #btnAbaixar{display:none;background:#8a6fff;box-shadow:0 4px 0 #6a4fd9;}
-  @media (pointer:coarse){#btnAbaixar{display:inline-block;}}
-  .toque #btnAbaixar{display:inline-block;}
-  p{color:#a0457a;text-align:center;margin:10px;font-size:15px;}
+  #btnTela{display:none;background:#5aa9e6;box-shadow:0 4px 0 #3a86c4;}
+  #btnAbaixar{display:none;position:fixed;right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 16px);font-size:22px;padding:16px 26px;background:#8a6fff;box-shadow:0 4px 0 #6a4fd9;opacity:.85;}
+  .toque #btnAbaixar{display:block;}
 </style>
 </head>
 <body>
-<div id="wrap">
-  <canvas id="c"></canvas>
-  <div class="bar">
-    <button id="btnAbaixar">⬇ Abaixar</button>
-    <button id="btnSom">🔊 Som</button>
-  </div>
-  <p>Espaço / ⬆ = pular (aperte 2x no ar para pulo duplo) · ⬇ = abaixar · No celular: toque na tela para pular</p>
+<canvas id="c"></canvas>
+<div id="safe"></div>
+<div class="bar">
+  <button id="btnSom">🔊</button>
+  <button id="btnTela">⛶ Tela cheia</button>
 </div>
+<button id="btnAbaixar">⬇ Abaixar</button>
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-const W = 900, H = 320, GROUND = 262, LX = 110;
+// mundo do jogo: 320 de altura "útil"; a largura (W) e o céu/chão extras se adaptam à tela
+let W = 900, H = 320, GROUND = 262, OY = 0, K = 1;
+const LX = 110;
+const safe = { t: 0, r: 0, b: 0, l: 0 };
+const TOQUE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const APP = navigator.standalone || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
 const SKIN = '#f6c9a0', HAIR = '#6b3e26', DRESS = '#ff6fae';
 const STAND_H = 100, DUCK_H = 66, SPR_SCALE = 0.5; // sprites: "parada" tem 200px de altura
 
@@ -58,12 +61,24 @@ Object.keys(CENTRO).forEach(n => {
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = W * dpr; cv.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const sw = cv.clientWidth || innerWidth, sh = cv.clientHeight || innerHeight;
+  // mostra pelo menos 820 de largura (para ver os obstáculos chegando) e 320 de altura
+  K = Math.min(sh / 320, sw / 820);
+  W = sw / K; H = sh / K;
+  // sobra de altura (celular em pé): a maior parte vira céu, o resto chão
+  const oy = Math.round((H - 320) * 0.7), dy = oy - OY;
+  OY = oy; GROUND = 262 + OY;
+  if (dy) {
+    laura.y += dy;
+    [obs, stars, particles].forEach(l => l.forEach(o => o.y += dy));
+  }
+  cv.width = Math.round(sw * dpr); cv.height = Math.round(sh * dpr);
+  ctx.setTransform(K * dpr, 0, 0, K * dpr, 0, 0);
   ctx.imageSmoothingQuality = 'high';
+  const cs = getComputedStyle(document.getElementById('safe'));
+  safe.t = parseFloat(cs.paddingTop) / K; safe.r = parseFloat(cs.paddingRight) / K;
+  safe.b = parseFloat(cs.paddingBottom) / K; safe.l = parseFloat(cs.paddingLeft) / K;
 }
-resize();
-addEventListener('resize', resize);
 
 // ---------- Som ----------
 let ac, somLigado = true;
@@ -95,6 +110,9 @@ function reset() {
   speed = 6; score = 0; spawnIn = 300; starIn = 500; milestone = 0; novoRecorde = false;
 }
 reset();
+resize();
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 250));
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -134,14 +152,32 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { if (['ArrowDown', 'KeyS'].includes(e.code)) laura.duck = false; });
 cv.addEventListener('pointerdown', e => { e.preventDefault(); press(); });
+// iOS: impede zoom/arrastar a página com dois dedos ou toque duplo
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
 
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('toque');
+if (TOQUE) document.body.classList.add('toque');
 const bA = document.getElementById('btnAbaixar');
 bA.addEventListener('pointerdown', e => { e.preventDefault(); laura.duck = true; });
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => bA.addEventListener(ev, () => laura.duck = false));
 const bS = document.getElementById('btnSom');
-function toggleSom() { somLigado = !somLigado; bS.textContent = somLigado ? '🔊 Som' : '🔇 Sem som'; }
+function toggleSom() { somLigado = !somLigado; bS.textContent = somLigado ? '🔊' : '🔇'; }
 bS.addEventListener('click', toggleSom);
+
+// botão de tela cheia (Android/PC no navegador; no iPhone a tela cheia vem do atalho na tela de início)
+const bT = document.getElementById('btnTela');
+const el = document.documentElement;
+if (!APP && !/; wv\)/.test(navigator.userAgent) && (el.requestFullscreen || el.webkitRequestFullscreen) && !IOS) bT.style.display = 'block';
+bT.addEventListener('click', () => {
+  if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else {
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    if (p && p.then) p.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
+  }
+});
+document.addEventListener('fullscreenchange', () => bT.textContent = document.fullscreenElement ? '✕ Sair' : '⛶ Tela cheia');
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 // ---------- Lógica ----------
 function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
@@ -207,7 +243,7 @@ function drawBackground() {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   // sol
-  ctx.save(); ctx.translate(800, 62);
+  ctx.save(); ctx.translate(W - 100, 62 + OY);
   ctx.rotate(t * 0.005);
   ctx.strokeStyle = '#ffd84d'; ctx.lineWidth = 4; ctx.lineCap = 'round';
   for (let i = 0; i < 10; i++) { ctx.rotate(Math.PI / 5); ctx.beginPath(); ctx.moveTo(36, 0); ctx.lineTo(48, 0); ctx.stroke(); }
@@ -217,7 +253,7 @@ function drawBackground() {
   // nuvens
   ctx.fillStyle = '#fff';
   clouds.forEach(c => {
-    ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
+    ctx.save(); ctx.translate(c.x, c.y + OY); ctx.scale(c.s, c.s);
     ctx.beginPath(); ctx.arc(0, 0, 18, 0, 7); ctx.arc(22, -10, 22, 0, 7); ctx.arc(46, 0, 18, 0, 7); ctx.fill();
     ctx.fillRect(0, 0, 46, 18);
     ctx.restore();
@@ -397,12 +433,13 @@ function text(str, x, y, size, cor = '#a0457a', align = 'center') {
 }
 
 function panel(lines) {
-  ctx.fillStyle = 'rgba(255,255,255,.82)'; rr(W / 2 - 230, 50, 460, 150, 24); ctx.fill();
-  lines.forEach(([s, y, size, cor]) => text(s, W / 2, y, size, cor));
+  ctx.fillStyle = 'rgba(255,255,255,.82)'; rr(W / 2 - 230, 50 + OY, 460, 150, 24); ctx.fill();
+  lines.forEach(([s, y, size, cor]) => text(s, W / 2, y + OY, size, cor));
 }
 
 function draw() {
   drawBackground();
+  if (H > W) { text('📱 Vire o celular', W / 2, OY / 2, 56, '#5a7fa8'); text('de lado para jogar!', W / 2, OY / 2 + 70, 56, '#5a7fa8'); }
   stars.forEach(drawStar);
   obs.forEach(drawObstacle);
   drawLaura();
@@ -410,11 +447,16 @@ function draw() {
   ctx.globalAlpha = 1;
 
   if (state !== 'start') {
-    text('⭐ ' + String(Math.floor(score)).padStart(5, '0'), W - 20, 32, 22, '#a0457a', 'right');
-    text('Recorde ' + String(best).padStart(5, '0'), W - 20, 56, 15, '#c77aa6', 'right');
+    const sx = W - 20 - safe.r, sy = Math.max(32 + safe.t, OY + 32);
+    text('⭐ ' + String(Math.floor(score)).padStart(5, '0'), sx, sy, 22, '#a0457a', 'right');
+    text('Recorde ' + String(best).padStart(5, '0'), sx, sy + 24, 15, '#c77aa6', 'right');
   }
   if (state === 'start') {
-    panel([['Laura Pula! 🌸', 105, 42, '#ff3d8b'], ['Pule as flores, pedras e abelhas', 145, 20], ['Toque na tela ou aperte ESPAÇO para começar', 180, 17, '#7a5a9a']]);
+    panel([['Laura Pula! 🌸', 105, 42, '#ff3d8b'], ['Pule as flores, pedras e abelhas', 145, 20], [TOQUE ? 'Toque na tela para começar' : 'Aperte ESPAÇO ou clique para começar', 180, 17, '#7a5a9a']]);
+    const dica = TOQUE ? 'Toque = pular (2x no ar = pulo duplo) · botão ⬇ = abaixar'
+      : 'Espaço / ⬆ = pular (2x no ar = pulo duplo) · ⬇ = abaixar · M = som';
+    text(dica, W / 2, GROUND + 36, 14, '#8a5a2a');
+    if (IOS && !APP) text('Para tela cheia: Compartilhar ⬆ → "Adicionar à Tela de Início"', W / 2, Math.min(H - 10 - safe.b, GROUND + 56), 13, '#8a5a2a');
   } else if (state === 'over') {
     panel([
       ['Ops! Quase, Laura! 💖', 100, 34, '#ff3d8b'],
